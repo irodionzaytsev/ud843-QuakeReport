@@ -15,15 +15,19 @@
  */
 package com.example.android.quakereport;
 
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
 import com.example.android.quakereport.earthquake.Earthquake;
 import com.example.android.quakereport.earthquake.EarthquakeAdapter;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 public class EarthquakeActivity extends AppCompatActivity {
 
@@ -33,19 +37,28 @@ public class EarthquakeActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.earthquake_activity);
+        EarthquakeFetchTask task = new EarthquakeFetchTask();
+        task.execute(QueryUtils.SAMPLE_URL);
+    }
+    private class EarthquakeFetchTask extends AsyncTask<String, Void, List<Earthquake>> {
 
-        // Create a fake list of earthquake locations.
-        ArrayList<Earthquake> earthquakes = QueryUtils.extractEarthquakes();
+        @Override
+        protected List<Earthquake> doInBackground(String... urls) {
+            try {
+                return QueryUtils.extractEarthquakes(QueryUtils.makeHttpRequest(urls[0]));
+            } catch (IOException e) {
+                Log.e(LOG_TAG, "Something went wrong while retrieving earthquake data");
+                return null;
+            }
+        }
 
+        @Override
+        protected void onPostExecute(List<Earthquake> earthquakes) {
+            if (earthquakes == null) return;
+            EarthquakeAdapter earthquakeAdapter= new EarthquakeAdapter(EarthquakeActivity.this, earthquakes);
+            ListView earthquakeListView = (ListView) findViewById(R.id.list);
+            earthquakeListView.setAdapter(earthquakeAdapter);
+        }
 
-        // Find a reference to the {@link ListView} in the layout
-        ListView earthquakeListView = (ListView) findViewById(R.id.list);
-
-        // Create a new {@link ArrayAdapter} of earthquakes
-        EarthquakeAdapter adapter = new EarthquakeAdapter(this, earthquakes);
-
-        // Set the adapter on the {@link ListView}
-        // so the list can be populated in the user interface
-        earthquakeListView.setAdapter(adapter);
     }
 }

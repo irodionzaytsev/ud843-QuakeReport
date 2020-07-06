@@ -20,11 +20,12 @@ import org.w3c.dom.Text;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.List;
 
 public class EarthquakeAdapter extends ArrayAdapter<Earthquake> {
     private static final String LOCATION_SEPARATOR = " of ";
     private static final String MAG_FORMAT = "0.0";
-    public EarthquakeAdapter(Context context, ArrayList<Earthquake> earthquakes) {
+    public EarthquakeAdapter(Context context, List<Earthquake> earthquakes) {
         super(context, 0, earthquakes);
     }
 

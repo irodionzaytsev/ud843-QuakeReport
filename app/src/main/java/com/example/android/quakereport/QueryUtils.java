@@ -8,7 +8,16 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Scanner;
 
 /**
  * Helper methods related to requesting and receiving earthquake data from USGS.
@@ -27,6 +36,10 @@ public final class QueryUtils {
             "{\"type\":\"Feature\",\"properties\":{\"mag\":7.2,\"place\":\"74km NW of Rumoi, Japan\",\"time\":1452532083920,\"updated\":1459304875040,\"tz\":540,\"url\":\"http://earthquake.usgs.gov/earthquakes/eventpage/us10004djn\",\"detail\":\"http://earthquake.usgs.gov/fdsnws/event/1/query?eventid=us10004djn&format=geojson\",\"felt\":8,\"cdi\":3.4,\"mmi\":3.74,\"alert\":\"green\",\"status\":\"reviewed\",\"tsunami\":0,\"sig\":594,\"net\":\"us\",\"code\":\"10004djn\",\"ids\":\",us10004djn,gcmt20160111170803,\",\"sources\":\",us,gcmt,\",\"types\":\",cap,dyfi,geoserve,impact-text,losspager,moment-tensor,nearby-cities,origin,phase-data,shakemap,tectonic-summary,\",\"nst\":null,\"dmin\":1.139,\"rms\":0.96,\"gap\":33,\"magType\":\"mww\",\"type\":\"earthquake\",\"title\":\"M 6.2 - 74km NW of Rumoi, Japan\"},\"geometry\":{\"type\":\"Point\",\"coordinates\":[141.0867,44.4761,238.81]},\"id\":\"us10004djn\"},\n" +
             "{\"type\":\"Feature\",\"properties\":{\"mag\":8.5,\"place\":\"227km SE of Sarangani, Philippines\",\"time\":1452530285900,\"updated\":1459304874040,\"tz\":480,\"url\":\"http://earthquake.usgs.gov/earthquakes/eventpage/us10004dj5\",\"detail\":\"http://earthquake.usgs.gov/fdsnws/event/1/query?eventid=us10004dj5&format=geojson\",\"felt\":1,\"cdi\":2.7,\"mmi\":7.5,\"alert\":\"green\",\"status\":\"reviewed\",\"tsunami\":1,\"sig\":650,\"net\":\"us\",\"code\":\"10004dj5\",\"ids\":\",at00o0srjp,pt16011050,us10004dj5,gcmt20160111163807,\",\"sources\":\",at,pt,us,gcmt,\",\"types\":\",cap,dyfi,geoserve,impact-link,impact-text,losspager,moment-tensor,nearby-cities,origin,phase-data,shakemap,tectonic-summary,\",\"nst\":null,\"dmin\":3.144,\"rms\":0.72,\"gap\":22,\"magType\":\"mww\",\"type\":\"earthquake\",\"title\":\"M 6.5 - 227km SE of Sarangani, Philippines\"},\"geometry\":{\"type\":\"Point\",\"coordinates\":[126.8621,3.8965,13]},\"id\":\"us10004dj5\"},\n" +
             "{\"type\":\"Feature\",\"properties\":{\"mag\":9,\"place\":\"Pacific-Antarctic Ridge\",\"time\":1451986454620,\"updated\":1459202978040,\"tz\":-540,\"url\":\"http://earthquake.usgs.gov/earthquakes/eventpage/us10004bgk\",\"detail\":\"http://earthquake.usgs.gov/fdsnws/event/1/query?eventid=us10004bgk&format=geojson\",\"felt\":0,\"cdi\":1,\"mmi\":0,\"alert\":\"green\",\"status\":\"reviewed\",\"tsunami\":0,\"sig\":554,\"net\":\"us\",\"code\":\"10004bgk\",\"ids\":\",us10004bgk,gcmt20160105093415,\",\"sources\":\",us,gcmt,\",\"types\":\",cap,dyfi,geoserve,losspager,moment-tensor,nearby-cities,origin,phase-data,shakemap,\",\"nst\":null,\"dmin\":30.75,\"rms\":0.67,\"gap\":71,\"magType\":\"mww\",\"type\":\"earthquake\",\"title\":\"M 6.0 - Pacific-Antarctic Ridge\"},\"geometry\":{\"type\":\"Point\",\"coordinates\":[-136.2603,-54.2906,10]},\"id\":\"us10004bgk\"}],\"bbox\":[-153.4051,-54.2906,10,158.5463,59.6363,582.56]}";
+
+    public static final String SAMPLE_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&orderby=time&minmag=5&limit=10";
+
+    private static final String LOG_TAG = "QueryUtils";
     /**
      * Create a private constructor because no one should ever create a {@link QueryUtils} object.
      * This class is only meant to hold static variables and methods, which can be accessed
@@ -39,7 +52,7 @@ public final class QueryUtils {
      * Return a list of {@link Earthquake} objects that has been built up from
      * parsing a JSON response.
      */
-    public static ArrayList<Earthquake> extractEarthquakes() {
+    public static ArrayList<Earthquake> extractEarthquakes(String GeoJSON) {
 
         // Create an empty ArrayList that we can start adding earthquakes to
         ArrayList<Earthquake> earthquakes = new ArrayList<>();
@@ -51,7 +64,7 @@ public final class QueryUtils {
 
             // TODO: Parse the response given by the SAMPLE_JSON_RESPONSE string and
             // build up a list of Earthquake objects with the corresponding data.
-            JSONObject root = new JSONObject(SAMPLE_JSON_RESPONSE);
+            JSONObject root = new JSONObject(GeoJSON);
             JSONArray earthquakeArray = root.getJSONArray("features");
             for (int i = 0; i < earthquakeArray.length(); ++i) {
                 JSONObject properties = earthquakeArray.getJSONObject(i).getJSONObject("properties");
@@ -72,6 +85,50 @@ public final class QueryUtils {
 
         // Return the list of earthquakes
         return earthquakes;
+    }
+
+    public static String makeHttpRequest(String url_string) throws IOException {
+        HttpURLConnection connection = null;
+        InputStream inputStream = null;
+        try {
+            URL url = new URL(url_string);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setReadTimeout(10000 /* milliseconds */);
+            connection.setConnectTimeout(15000 /* milliseconds */);
+            connection.setRequestMethod("GET");
+            connection.connect();
+            if (connection.getResponseCode() != 200) {
+                Log.e(LOG_TAG, "Bad response code:" + connection.getResponseCode());
+                return "";
+            }
+            inputStream = connection.getInputStream();
+            return readAllChars(inputStream);
+
+        } catch (MalformedURLException e) {
+            Log.e(LOG_TAG, "Error with URL creation", e);
+            return "";
+        } catch (IOException e) {
+            Log.e(LOG_TAG, "Problem retrieving JSON", e);
+            return "";
+        } finally {
+            if (connection != null) connection.disconnect();
+            if (inputStream != null) inputStream.close();
+        }
+    }
+    private static String readAllChars(InputStream is) {
+        try {
+            BufferedReader br = new BufferedReader(new InputStreamReader(is, Charset.forName("UTF-8")));
+            StringBuilder sb = new StringBuilder();
+            String line = br.readLine();
+            while (line != null) {
+                sb.append(line);
+                line = br.readLine();
+            }
+            return sb.toString();
+        } catch (IOException e) {
+            Log.e(LOG_TAG, "Failed to read json", e);
+            return "";
+        }
     }
 
 }
